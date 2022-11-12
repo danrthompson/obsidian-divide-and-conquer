@@ -38,12 +38,12 @@ export default class divideAndConquer extends Plugin {
 		console.log("Divide & Conquer Plugin loaded.");
 
 		let maybeReload = () => {
-			if (this.settings.reloadAfterPluginChanges)
-				// TODO: timeout isn't the best way to do this
-				setTimeout(
-					() => this.app.commands.executeCommandById("app:reload"),
-					2000
-				); // eslint-disable-line no-magic-numbers
+			// if (this.settings.reloadAfterPluginChanges)
+			// 	// TODO: timeout isn't the best way to do this
+			// 	setTimeout(
+			// 		() => this.app.commands.executeCommandById("app:reload"),
+			// 		2000
+			// 	); // eslint-disable-line no-magic-numbers
 		};
 
 		const notice = () => {
@@ -246,11 +246,11 @@ export default class divideAndConquer extends Plugin {
 		if (reloadAfterwards) noticeText += "\n\nReloading Obsidian...";
 		new Notice(noticeText);
 
-		if (reloadAfterwards) {
-			setTimeout(() => {
-				this.app.commands.executeCommandById("app:reload");
-			}, reloadDelay);
-		}
+		// if (reloadAfterwards) {
+		// 	setTimeout(() => {
+		// 		this.app.commands.executeCommandById("app:reload");
+		// 	}, reloadDelay);
+		// }
 	}
 
 	public async loadData() {
@@ -259,6 +259,7 @@ export default class divideAndConquer extends Plugin {
 			DEFAULT_SETTINGS,
 			await super.loadData()
 		);
+		this.steps = this.settings.steps;
 		this.disabledState = this.settings.disabledState
 			? JSON.parse(this.settings.disabledState).map(
 					(set: string[]) => new Set(set)
@@ -272,6 +273,7 @@ export default class divideAndConquer extends Plugin {
 				this.disabledState.map((set) => [...set])
 			);
 		else this.settings.disabledState = undefined;
+		this.settings.steps = this.steps;
 		if (restore) await this.restore();
 		await super.saveData(this.settings);
 	}
@@ -286,6 +288,7 @@ export default class divideAndConquer extends Plugin {
 			enabled.slice(0, Math.floor(enabled.length / 2))
 		);
 		if (half.length > 0) this.disabledState.push(new Set(half));
+		this.saveData(false);
 		return half;
 	}
 
@@ -294,7 +297,12 @@ export default class divideAndConquer extends Plugin {
 		const { disabled } = this.getCurrentEDPs();
 		await this.enablePlugins(disabled);
 		// this allows unbisect to turn on all plugins without losing the original state
-		if (this.disabledState.length > 1) return this.disabledState.pop();
+		if (this.disabledState.length > 1) {
+			const poppedDisabledState = this.disabledState.pop();
+			this.saveData(false);
+			return poppedDisabledState;
+		}
+		this.saveData(false);
 		return new Set();
 	}
 
@@ -308,11 +316,13 @@ export default class divideAndConquer extends Plugin {
 		const toDisable = enabled.filter((id) => !reenabled.has(id));
 		await this.disablePlugins(toDisable);
 		if (toDisable.length > 0) this.disabledState.push(new Set(toDisable));
+		this.saveData(false);
 	}
 
 	public reset() {
 		this.disabledState = this.settings.disabledState = undefined;
 		this.steps = 1;
+		this.saveData(false);
 		// we don't need to set the original state here because it is lazily created
 	}
 
@@ -322,6 +332,7 @@ export default class divideAndConquer extends Plugin {
 			this.enablePlugins(this.disabledState[i]);
 		await this.disablePlugins(this.disabledState[0]);
 		this.reset();
+		this.saveData(false);
 	}
 
 	// EDPs = Enabled/Disabled Plugins
